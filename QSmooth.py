@@ -1,6 +1,7 @@
+# -*- coding: utf-8 -*-
 ##########################################
 
-# Author: Dominika Durovcikova (University of Oxford)
+# Author: Dominika Ďurovčíková (University of Oxford)
 # Correspondence: dominika.durovcikova@gmail.com
 
 # If used, please cite:
@@ -17,10 +18,16 @@ import pandas as pd
 import numpy as np
 from scipy.signal import find_peaks
 from sklearn import linear_model
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 
-def open_fits(filename,path):
+def open_calibrate_fits(filename,path):
     hdu_raw = pf.open(str(path)+str(filename))
+    # Either calibrate to rest wavelengths based on redshift from a particular line, e.g. Mg-II
+    # https://data.sdss.org/datamodel/files/BOSS_SPECTRO_REDUX/RUN2D/PLATE4/RUN1D/spZline.html
+	# loglam = hdu['loglam'] - np.log10(1+hdu_raw[3].data['LINEZ'][5])
+    # Or calibrate to rest wavelengths based on the redshift from the SDSS pipelines.
     loglam = hdu_raw[1].data['loglam'] - np.log10(1+hdu_raw[2].data['Z'])
     flux = hdu_raw[1].data['flux']
     err = hdu_raw[1].data['ivar']
@@ -102,7 +109,7 @@ def running_median(datx,daty,bin_size=30,shuffle=5,Lya=False):
 
 def smooth(x,y,y_err,mask=None):
     # Smooths raw input spectral data given by (x,y) and errors y_err according to procedure outlined in Appendix B
-    # of Durovcikova et al. 2019 (https://arxiv.org/abs/1912.01050).
+    # of Ďurovčíková et al. 2019 (https://arxiv.org/abs/1912.01050).
     # In this process, a mask can be used to reject some data points from the smoothing procedure.
 
     if len(mask)>0:
