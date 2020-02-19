@@ -40,7 +40,7 @@ import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 
-def perform_catalog_cut(catalog='DR14Q_v4_4.fits', z_start=2.09, z_end=2.51, out_file='QSO_catalog_cut.fits'):
+def perform_catalog_cut(catalog='DR14Q_v4_4.fits', z_start=2.09, z_end=2.51, out_file=None):
     # Performs a ZWARNING, BAL and redshift cut on the catalog given by catalog.
 
     hdu = pf.open(str(catalog))
@@ -56,15 +56,15 @@ def perform_catalog_cut(catalog='DR14Q_v4_4.fits', z_start=2.09, z_end=2.51, out
     hdudata_three = hdudata_two[mask_range]
 
     hdu_new = pf.BinTableHDU(data=hdudata_three[:100])
-    hdu_new.writeto(str(out_file))
+    if out_file != None:
+        hdu_new.writeto(str(out_file))
     hdu.close()
     return hdu_new
     
-def download_spec_files(filename,target_directory):
+def download_spec_files(hdu,target_directory):
     # Composes a download_SDSS.txt list of quasar spectra to be downloaded from the SAS via
     # wget -i download_SDSS.txt
 
-    hdu = pf.open(filename)
     hdudata = hdu[1].data
     # Create the txt file with writing permissions
     file = open('download_SDSS.txt','w+')
@@ -88,7 +88,7 @@ def download_spec_files(filename,target_directory):
     cmd = 'wget -i download_SDSS.txt --output '+str(target_directory)
     os.system(cmd)
 
-def preprocess_training_data(input_directory, output_directory, output_directory_plots='plots/', SN_threshold=7.0, norm_lam = 1290, lam_start=1000, lam_stop=3900):
+def preprocess_training_data(input_directory, output_spectra_file=None, output_norm_file=None, output_directory_plots='plots/', SN_threshold=7.0, norm_lam = 1290, lam_start=1000, lam_stop=3900):
     # Add description
 
     norm_loglam = np.around(np.log10(norm_lam),decimals=4)
@@ -147,12 +147,14 @@ def preprocess_training_data(input_directory, output_directory, output_directory
 
     print('shape after processing:')
     print(Df.shape)
-    Df.to_csv(str(output_directory)+str(SN_threshold)+'SN_QSO_spectra_primary.csv')
-    norm.to_csv(str(output_directory)+str(SN_threshold)+'SN_QSO_spectra_norm_primary.csv')
+    if output_spectra_file != None:
+        Df.to_csv(str(output_spectra_file))
+    if output_norm_file != None:
+        norm.to_csv(str(output_norm_file))
 
     return Df, norm
 
-def perform_flux_cut(Df, output_directory, SN_threshold=7.0, thres_lam=1280):
+def perform_flux_cut(Df, output_file=None,thres_lam=1280):
     # Performs a set of cuts on the smoothed flux:
     # 1. Reject spectra whose fluxes fall below 0.5 below 128 nm (quasars with strongest associated absorption)
     # 2. Reject spectra whose fluxes fall below 0.1 above 128 nm (remove remaining quasars with poor SN ratio on the red side)
@@ -164,9 +166,30 @@ def perform_flux_cut(Df, output_directory, SN_threshold=7.0, thres_lam=1280):
 
     print('shape after flux cuts:')
     print(Df_new.shape)
-    Df_new.to_csv(str(output_directory)+str(SN_threshold)+'SN_QSO_spectra_preprocessed.csv')
+    if output_file != None:
+        Df_new.to_csv(str(output_file))
 
     return Df_new
+
+def prepare_training_set(input_spectra_file,input_norm_file,output_spectra_file,output_norm_file,lam_start=1191.5,lam_stop=2900):
+    # Prepares the final training set, to be used for a Random Forest based cleanup.
+    # The wavelength range is given by lam_start and lam_stop.
+
+    Df_raw = input_spectra_file
+    loglam_start = np.around(np.log10(lam_start),decimals=4)
+    loglam_stop = np.around(np.log10(lam_stop),decimals=4)
+    start = Df_raw.columns.get_loc(str(loglam_start))
+    stop = Df_raw.columns.get_loc(str(loglam_stop))
+    Df_clean = Df_raw.drop(Df_raw.columns[stop:],axis=1)
+    Df_clean = Df_clean.drop(Df_clean.columns[1:start],axis=1)
+    # Drop quasars with missing data in this wavelength range.
+    Df = Df_clean.dropna(axis=0)
+    Df.to_csv(str(output_spectra_file))
+    ID_dat = input_norm_file
+    ID_df = ID_dat[ID_dat.iloc[:,0].isin(Df.iloc[:,0])]
+    ID_df.to_csv(str(output_norm_file))
+
+    return Df, ID_df
 
 def plot_example_spectrum(path,loglam,flux,err,loglam_smooth,flux_smooth,spec_id,norm_flux=None):
     plt.rc('text',usetex=True)
@@ -193,8 +216,8 @@ def plot_example_spectrum(path,loglam,flux,err,loglam_smooth,flux_smooth,spec_id
         axs[1].plot(10**loglam_smooth,np.divide(flux_smooth,norm_flux),color='c')
         axs[0].set_ylabel(r'${\rm normalized\ flux}$')
         axs[1].set_ylabel(r'${\rm normalized\ flux}$')
-        axs[0].set_ylim([-0.02,5])
-        axs[1].set_ylim([-0.02,5])
+        axs[0].set_ylim([-0.02,7])
+        axs[1].set_ylim([-0.02,7])
     axs[1].set_xlabel(r'${\rm rest\ wavelength\ [}$' r'$\mathrm{\AA}$' r'${\rm ]}$')
     axs[0].set_xlim([1150, 2900])
     axs[1].set_xlim([1150, 1500])
