@@ -37,7 +37,7 @@ from scipy.signal import find_peaks
 from sklearn import linear_model
 from QSmooth import open_calibrate_fits, mask_SDSS, smooth
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 def perform_catalog_cut(catalog='DR14Q_v4_4.fits', z_start=2.09, z_end=2.51, out_file=None):
@@ -55,17 +55,19 @@ def perform_catalog_cut(catalog='DR14Q_v4_4.fits', z_start=2.09, z_end=2.51, out
     mask_range = (hdudata_two['Z_PIPE'] > z_start) & (hdudata_two['Z_PIPE'] < z_end)
     hdudata_three = hdudata_two[mask_range]
 
-    hdu_new = pf.BinTableHDU(data=hdudata_three[:100])
+    data_out = hdudata_three
+    hdu_new = pf.BinTableHDU(data=data_out)
     if out_file != None:
         hdu_new.writeto(str(out_file))
     hdu.close()
-    return hdu_new
+    
+    return data_out
     
 def download_spec_files(hdu,target_directory):
     # Composes a download_SDSS.txt list of quasar spectra to be downloaded from the SAS via
     # wget -i download_SDSS.txt
 
-    hdudata = hdu[1].data
+    hdudata = hdu
     # Create the txt file with writing permissions
     file = open('download_SDSS.txt','w+')
     # Loop over hdudata elements and write the corresponding URL to the file
@@ -83,12 +85,10 @@ def download_spec_files(hdu,target_directory):
             #NOTE: this is done as I haven't found a way to get the corresponding RUN2D (26, 103 or 104) from the catalog
             #so two out of three SDSS links will not find a file to download (that's OK)
     file.close()
-    hdu.close()
-    # !!Downloading to a target directory is not working!!
-    cmd = 'wget -i download_SDSS.txt --output '+str(target_directory)
+    cmd = 'wget -i download_SDSS.txt --directory-prefix='+str(target_directory)
     os.system(cmd)
 
-def preprocess_training_data(input_directory, output_spectra_file=None, output_norm_file=None, output_directory_plots='plots/', SN_threshold=7.0, norm_lam = 1290, lam_start=1000, lam_stop=3900):
+def preprocess_training_data(input_directory, output_spectra_file=None, output_norm_file=None, output_directory_plots='plots/preprocessing/', SN_threshold=7.0, norm_lam = 1290, lam_start=1000, lam_stop=3900):
     # Add description
 
     norm_loglam = np.around(np.log10(norm_lam),decimals=4)
@@ -96,11 +96,10 @@ def preprocess_training_data(input_directory, output_spectra_file=None, output_n
 
     Df = pd.DataFrame(data=[])
     norm = pd.DataFrame(data=[])
-    m = -1
+    m = 0
 
     for filename in os.listdir(str(input_directory)):
         if filename.endswith('.fits'):
-            m += 1
             print(m)
             print(str(filename))
             spec = pf.open(str(input_directory)+str(filename))
@@ -135,7 +134,8 @@ def preprocess_training_data(input_directory, output_spectra_file=None, output_n
                             Df = Df.append(df_norm)
                             norm_here = pd.DataFrame(data=[norm_flux],index=spec_id)
                             norm = norm.append(norm_here)
-                            if m % 1 == 0:
+                            m += 1
+                            if m % 100 == 0:
                                 plot_example_spectrum(path=output_directory_plots,loglam=loglam,flux=flux,err=err,loglam_smooth=loglam_target,flux_smooth=int_flux,spec_id=spec_id[0],norm_flux=norm_flux)
                         df = []
                         df_norm = []
@@ -178,8 +178,8 @@ def prepare_training_set(input_spectra_file,input_norm_file,output_spectra_file,
     Df_raw = input_spectra_file
     loglam_start = np.around(np.log10(lam_start),decimals=4)
     loglam_stop = np.around(np.log10(lam_stop),decimals=4)
-    start = Df_raw.columns.get_loc(str(loglam_start))
-    stop = Df_raw.columns.get_loc(str(loglam_stop))
+    start = Df_raw.columns.get_loc(loglam_start)
+    stop = Df_raw.columns.get_loc(loglam_stop)
     Df_clean = Df_raw.drop(Df_raw.columns[stop:],axis=1)
     Df_clean = Df_clean.drop(Df_clean.columns[1:start],axis=1)
     # Drop quasars with missing data in this wavelength range.
