@@ -102,25 +102,24 @@ def prepare_training_data(training_spectra,training_norms,models_save=False,path
 
     return scaler_red_one, pca_red, scaler_red_two, train_red, test_red, scaler_blue_one, pca_blue, scaler_blue_two, train_blue, test_blue
 
-def get_QSANNdRA(red_comp=63,n_two=40,n_three=40,blue_comp=36,seed=s,act='elu',optimizer='adam'):
+def get_QSANNdRA(red_comp=63,n_two=40,n_three=40,blue_comp=36,seed=0,act='elu',optimizer='adam'):
 	model = Sequential()
-	model.add(Dense(n_two, input_dim=red_comp, kernel_initializer=initializers.RandomNormal(seed=s),bias_initializer=initializers.RandomNormal(seed=s),activation=act))
-	model.add(Dense(n_three, kernel_initializer=initializers.RandomNormal(seed=s),bias_initializer=initializers.RandomNormal(seed=s),activation=act))
-	model.add(Dense(blue_comp, kernel_initializer=initializers.RandomNormal(seed=s),bias_initializer=initializers.RandomNormal(seed=s)))
+	model.add(Dense(n_two, input_dim=red_comp, kernel_initializer=initializers.RandomNormal(seed=seed),bias_initializer=initializers.RandomNormal(seed=seed),activation=act))
+	model.add(Dense(n_three, kernel_initializer=initializers.RandomNormal(seed=seed),bias_initializer=initializers.RandomNormal(seed=seed),activation=act))
+	model.add(Dense(blue_comp, kernel_initializer=initializers.RandomNormal(seed=seed),bias_initializer=initializers.RandomNormal(seed=seed)))
 	model.compile(loss='mean_absolute_error',optimizer=optimizer,metrics=['mae'])
-    
-    return model
+    #return model
 
 def load_QSANNdRA_weights(model,weights):
     model.load_weights(weights)
 
     return model
 
-def train_QSANNdRA(train_red,train_blue,epochs=80,batch_size=500,validation_split=0.2,checkpointer_path):
+def train_QSANNdRA(model,train_red,train_blue,checkpointer_path,epochs=80,batch_size=500,validation_split=0.2):
 
 	checkpointer = ModelCheckpoint(filepath=checkpointer_path,verbose=1,save_best_only=True,monitor='val_loss',mode='min',period=5)
 	history = model.fit(train_red, train_blue, epochs=epochs, batch_size=batch_size,verbose=1, shuffle=True,validation_split=validation_split,callbacks=[checkpointer])
 	
-    return history, model 
+    #return history, model 
 
 
