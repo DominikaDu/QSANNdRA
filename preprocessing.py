@@ -27,6 +27,7 @@
 #    interpolate a given number of data points for each object
 # 7. normalize the flux values for all spectra
 # 8. perform a final cut and thus create a training set
+# 9. perform a Random Forest based cleaning of the training set
 
 import os
 import pyfits as pf
@@ -35,10 +36,14 @@ import pandas as pd
 import numpy as np
 from scipy.signal import find_peaks
 from sklearn import linear_model
+from sklearn.model_selection import KFold
+from sklearn.ensemble import RandomForestRegressor as RFR
 from QSmooth import open_calibrate_fits, mask_SDSS, smooth
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import QSANNdRA as Q
+
 
 def perform_catalog_cut(catalog='DR14Q_v4_4.fits', z_start=2.09, z_end=2.51, out_file=None):
     # Performs a ZWARNING, BAL and redshift cut on the catalog given by catalog.
@@ -224,3 +229,83 @@ def plot_example_spectrum(path,loglam,flux,err,loglam_smooth,flux_smooth,spec_id
     axs[0].legend(frameon=False)
     plt.savefig(str(path)+str(spec_id)+'_example.png',bbox_inches='tight',dpi=300)
     plt.close()
+
+def RF_cleanup(spectra_file,norms_file,path_to_clean_spectra,path_to_bad_spectra,path_to_clean_norms,path_to_bad_norms,RF_num=100,pca_variance=0.99,ratio=0.8,norm_lam=1290,n_folds=10):
+	spectra = pd.read_csv(str(spectra_file))
+    norms = pd.read_csv(str(norms_file))
+
+    norm_loglam = np.around(np.log10(norm_lam),decimals=4)
+
+    spectra = spectra.drop(columns=str(norm_loglam)) # Drop 1290 column, as all spectra have flux normalized to 1 here (no variance)
+	spectra = spectra.drop(spectra.columns[0:2],axis=1) # These contain row numbers and spectrum ids
+
+	norms = norms.drop(norms.columns[0],axis=1) # This contains row numbers
+	loglams = np.array(spectra.columns).astype(np.float) # Extract wavelengths
+    lams = 10**loglams
+
+    # Divide spectra into input and output arrays
+    blue = spectra.loc[:,:str(norm_loglam+0.0001)].values
+	red = spectra.loc[:,str(norm_loglam+0.0001):].values
+
+    # K-fold split for cleanup
+    skfolds = KFold(n_splits=n_folds, random_state=0, shuffle=False)
+	i = 1 # Counter
+	spectra_clean = pd.DataFrame(data=[])
+	norms_clean = pd.DataFrame(data=[])
+    for train_id, test_id in skfolds.split(red,blue):
+        print('fold '+str(i))
+        train_red_orig = red[train_id]
+        train_blue_orig = blue[train_id]
+        test_red_orig = red[test_id]
+        test_blue_orig = blue[test_id]
+        ids_test = norms.iloc[test_id,0]
+
+        scaler_red, train_red, test_red = Q.standardize(train_red_orig,test_red_orig)
+        scaler_blue, train_blue, test_blue = Q.standardize(train_blue_orig,test_blue_orig)
+        pca_red, train_red, test_red = Q.perform_PCA(train_red,test_red,n_components=pca_variance)
+        pca_blue, train_blue, test_blue = Q.perform_PCA(train_blue,test_blue,n_components=pca_variance)
+
+        reg = RFR(n_estimators=RF_num,random_state=0)
+		reg.fit(train_red,train_blue)
+        RF_blue = reg.predict(test_red)
+
+        RF_blue_trans = scaler_blue.inverse_transform(pca_blue.inverse_transform(RF_blue))
+
+		# Reject data points in the test fold
+		err = ((np.abs(RF_blue_trans - test_blue_orig)/test_blue_orig)).mean(axis=0) # Calculate mean absolute error for each wavelength
+		std = ((np.abs(RF_blue_trans - test_blue_orig)/test_blue_orig)).std(axis=0) # Calculate std of absolute error for each wavelength
+		# Reject data points that lie above 3 standard deviations away from mean
+		test_blue_clean = np.where(((RF_blue_trans - test_blue_orig)/test_blue_orig) < err+3*std,test_blue_orig,np.nan)
+		RF_blue_clean = np.where(((RF_blue_trans - test_blue_orig)/test_blue_orig) < err+3*std,RF_blue_trans,np.nan)
+
+        # Calculate fraction of rejected data points
+		a = sum(sum(np.isnan(RF_blue_clean)))
+		b = np.int(np.size(RF_blue_clean))
+		print('rejected '+np.str(np.float(a)/np.float(b)))
+
+        # Append the clean arrays to prepared dataframes
+		test_new = np.concatenate((test_blue_clean,test_red_orig),axis=1)
+		test_df = pd.DataFrame(data=test_new,columns=loglams,index=test_id)
+		spectra_clean = spectra_clean.append(test_df)
+
+        i += 1
+    
+    # Drop spectra with rejected data points
+    Spectra_clean = spectra_clean.dropna(axis=0,how='any')
+	Spectra_clean.to_csv(str(path_to_clean_spectra))
+    Norms_clean = norms[norms.iloc[:,1].isin(Spectra_clean.iloc[:,0])]
+	Norms_clean = Norms_clean.drop(norms.columns[0],axis=1)
+	Norms_clean.to_csv(str(path_to_clean_norms))
+	
+	Spectra_bad = spectra_clean[~spectra_clean.index.isin(Spectra_clean.index)]
+	Spectra_bad_full = spectra.iloc[Spectra_bad.index]
+	Spectra_bad_full.to_csv(str(path_to_bad_spectra))
+    Norms_bad = norms[norms.iloc[:,1].isin(Spectra_bad.iloc[:,0])]
+	Norms_bad = Norms_bad.drop(norms.columns[0],axis=1)
+	Norms_bad.to_csv(str(path_to_bad_norms))
+
+    return Spectra_clean, Norms_clean, Spectra_bad, Norms_bad
+
+
+
+
