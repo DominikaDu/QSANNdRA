@@ -17,6 +17,8 @@
 
 
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import pyfits as pf
 import pandas as pd
@@ -29,13 +31,14 @@ from keras.layers import Dense
 from keras import optimizers
 from keras.callbacks import ModelCheckpoint
 from keras import initializers
+import preprocessing as pr
 
 def save_model(model,target_path):
     joblib.dump(model,str(path))
 
 def load_training_data(path_to_spectra,path_to_norms):
     spectra = pd.read_csv(path_to_spectra)
-    norms = pd.read_csc(path_to_norms)
+    norms = pd.read_csv(path_to_norms)
     spectra = spectra.drop(spectra.columns[0],axis=1)
     norms = norms.drop(norms.columns[0],axis=1)
 
@@ -53,11 +56,11 @@ def train_test_split(dataframe,ratio=0.8,lam=1290):
     train = dataframe.iloc[:(np.int(ratio*len(dataframe)))]
     test = dataframe.iloc[(np.int(ratio*len(dataframe))):]
 
-    loglam = np.around(np.log10(lam),decimals=4)+0.0001
+    loglam = np.around(np.log10(lam),decimals=4)
     train_blue = train.loc[:,:str(loglam)].values
-    train_red = train.loc[:,str(loglam):].values
+    train_red = train.loc[:,str(loglam+0.0001):].values
     test_blue = test.loc[:,:str(loglam)].values
-    test_red = test.loc[:,str(loglam):].values
+    test_red = test.loc[:,str(loglam+0.0001):].values
 
     return train_red, train_blue, test_red, test_blue
 
@@ -91,8 +94,8 @@ def transform_training_data(train_orig,test_orig,n_comp,save=False,target_path=N
 def prepare_training_data(training_spectra,training_norms,models_save=False,path_to_models=None):
     # Loads and splits training data into train and test sets and performs a sequence of standardization, PCA, standardization.
 
-    spectra, norms = Q.load_training_data(path_to_spectra=training_spectra,path_to_norms=training_norms)
-    lam = Q.extract_lambdas(dataframe=spectra)
+    spectra, norms = load_training_data(path_to_spectra=training_spectra,path_to_norms=training_norms)
+    lam = extract_lambdas(dataframe=spectra)
     train_red_orig, train_blue_orig, test_red_orig, test_blue_orig = \
         train_test_split(dataframe=spectra,ratio=0.8,lam=1290)
     scaler_red_one, pca_red, scaler_red_two, train_red, test_red = \
