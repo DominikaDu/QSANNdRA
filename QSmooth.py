@@ -19,7 +19,7 @@ import numpy as np
 from scipy.signal import find_peaks
 from sklearn import linear_model
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 def open_calibrate_fits(filename,path):

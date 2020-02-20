@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import os
 from scipy import interpolate
 import pyfits as pf
