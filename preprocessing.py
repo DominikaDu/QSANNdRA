@@ -250,8 +250,7 @@ def RF_cleanup(spectra_file,norms_file,path_to_clean_spectra,path_to_bad_spectra
     # K-fold split for cleanup
     skfolds = KFold(n_splits=n_folds, random_state=0, shuffle=False)
 	i = 1 # Counter
-	spectra_clean = pd.DataFrame(data=[])
-	norms_clean = pd.DataFrame(data=[])
+	spectra_nan = pd.DataFrame(data=[])
     for train_id, test_id in skfolds.split(red,blue):
         print('fold '+str(i))
         train_red_orig = red[train_id]
@@ -267,44 +266,44 @@ def RF_cleanup(spectra_file,norms_file,path_to_clean_spectra,path_to_bad_spectra
 
         reg = RFR(n_estimators=RF_num,random_state=0)
 		reg.fit(train_red,train_blue)
-        RF_blue = reg.predict(test_red)
+        rf_blue = reg.predict(test_red)
 
-        RF_blue_trans = scaler_blue.inverse_transform(pca_blue.inverse_transform(RF_blue))
+        rf_blue_trans = scaler_blue.inverse_transform(pca_blue.inverse_transform(rf_blue))
 
 		# Reject data points in the test fold
-		err = ((np.abs(RF_blue_trans - test_blue_orig)/test_blue_orig)).mean(axis=0) # Calculate mean absolute error for each wavelength
-		std = ((np.abs(RF_blue_trans - test_blue_orig)/test_blue_orig)).std(axis=0) # Calculate std of absolute error for each wavelength
+		err = ((np.abs(rf_blue_trans - test_blue_orig)/test_blue_orig)).mean(axis=0) # Calculate mean absolute error for each wavelength
+		std = ((np.abs(rf_blue_trans - test_blue_orig)/test_blue_orig)).std(axis=0) # Calculate std of absolute error for each wavelength
 		# Reject data points that lie above 3 standard deviations away from mean
-		test_blue_clean = np.where(((RF_blue_trans - test_blue_orig)/test_blue_orig) < err+3*std,test_blue_orig,np.nan)
-		RF_blue_clean = np.where(((RF_blue_trans - test_blue_orig)/test_blue_orig) < err+3*std,RF_blue_trans,np.nan)
+		test_blue_clean = np.where(((rf_blue_trans - test_blue_orig)/test_blue_orig) < err+3*std,test_blue_orig,np.nan)
+		rf_blue_clean = np.where(((rf_blue_trans - test_blue_orig)/test_blue_orig) < err+3*std,rf_blue_trans,np.nan)
 
         # Calculate fraction of rejected data points
-		a = sum(sum(np.isnan(RF_blue_clean)))
-		b = np.int(np.size(RF_blue_clean))
-		print('rejected '+np.str(np.float(a)/np.float(b)))
+		rejected = sum(sum(np.isnan(rf_blue_clean)))
+		total = np.int(np.size(rf_blue_clean))
+		print('rejected '+np.str(np.float(rejected)/np.float(total)))
 
         # Append the clean arrays to prepared dataframes
 		test_new = np.concatenate((test_blue_clean,test_red_orig),axis=1)
 		test_df = pd.DataFrame(data=test_new,columns=loglams,index=test_id)
-		spectra_clean = spectra_clean.append(test_df)
+		spectra_nan = spectra_nan.append(test_df)
 
         i += 1
     
     # Drop spectra with rejected data points
-    Spectra_clean = spectra_clean.dropna(axis=0,how='any')
-	Spectra_clean.to_csv(str(path_to_clean_spectra))
-    Norms_clean = norms[norms.iloc[:,1].isin(Spectra_clean.iloc[:,0])]
-	Norms_clean = Norms_clean.drop(norms.columns[0],axis=1)
-	Norms_clean.to_csv(str(path_to_clean_norms))
+    spectra_clean = spectra_nan.dropna(axis=0,how='any')
+	spectra_clean.to_csv(str(path_to_clean_spectra))
+    norms_clean = norms[norms.iloc[:,1].isin(spectra_clean.iloc[:,0])]
+	norms_clean = norms_clean.drop(norms.columns[0],axis=1)
+	norms_clean.to_csv(str(path_to_clean_norms))
 	
-	Spectra_bad = spectra_clean[~spectra_clean.index.isin(Spectra_clean.index)]
-	Spectra_bad_full = spectra.iloc[Spectra_bad.index]
-	Spectra_bad_full.to_csv(str(path_to_bad_spectra))
-    Norms_bad = norms[norms.iloc[:,1].isin(Spectra_bad.iloc[:,0])]
-	Norms_bad = Norms_bad.drop(norms.columns[0],axis=1)
-	Norms_bad.to_csv(str(path_to_bad_norms))
+	spectra_bad = spectra_nan[~spectra_nan.index.isin(spectra_clean.index)]
+	spectra_bad_full = spectra.iloc[spectra_bad.index]
+	spectra_bad_full.to_csv(str(path_to_bad_spectra))
+    norms_bad = norms[norms.iloc[:,1].isin(spectra_bad.iloc[:,0])]
+	norms_bad = norms_bad.drop(norms.columns[0],axis=1)
+	norms_bad.to_csv(str(path_to_bad_norms))
 
-    return Spectra_clean, Norms_clean, Spectra_bad, Norms_bad
+    return spectra_clean, norms_clean, spectra_bad, norms_bad
 
 
 
