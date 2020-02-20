@@ -53,7 +53,7 @@ def train_test_split(dataframe,ratio=0.8,lam=1290):
     train = dataframe.iloc[:(np.int(ratio*len(dataframe)))]
     test = dataframe.iloc[(np.int(ratio*len(dataframe))):]
 
-    loglam = np.around(np,log10(lam),decimals=4)
+    loglam = np.around(np.log10(lam),decimals=4)+0.0001
     train_blue = train.loc[:,:str(loglam)].values
     train_red = train.loc[:,str(loglam):].values
     test_blue = test.loc[:,:str(loglam)].values
