@@ -189,6 +189,7 @@ def prepare_training_set(input_spectra_file,input_norm_file,output_spectra_file,
     Df_clean = Df_clean.drop(Df_clean.columns[1:start],axis=1)
     # Drop quasars with missing data in this wavelength range.
     Df = Df_clean.dropna(axis=0)
+    print(np.shape(Df))
     Df.to_csv(str(output_spectra_file))
     ID_dat = input_norm_file
     ID_df = ID_dat[ID_dat.iloc[:,0].isin(Df.iloc[:,0])]
@@ -231,77 +232,79 @@ def plot_example_spectrum(path,loglam,flux,err,loglam_smooth,flux_smooth,spec_id
     plt.close()
 
 def RF_cleanup(spectra_file,norms_file,path_to_clean_spectra,path_to_bad_spectra,path_to_clean_norms,path_to_bad_norms,RF_num=100,pca_variance=0.99,ratio=0.8,norm_lam=1290,n_folds=10):
-	spectra = pd.read_csv(str(spectra_file))
+    spectra = pd.read_csv(str(spectra_file))
     norms = pd.read_csv(str(norms_file))
 
     norm_loglam = np.around(np.log10(norm_lam),decimals=4)
 
     spectra = spectra.drop(columns=str(norm_loglam)) # Drop 1290 column, as all spectra have flux normalized to 1 here (no variance)
-	spectra = spectra.drop(spectra.columns[0:2],axis=1) # These contain row numbers and spectrum ids
+    spectra = spectra.drop(spectra.columns[0:2],axis=1) # These contain row numbers and spectrum ids
 
-	norms = norms.drop(norms.columns[0],axis=1) # This contains row numbers
-	loglams = np.array(spectra.columns).astype(np.float) # Extract wavelengths
-    lams = 10**loglams
+    norms = norms.drop(norms.columns[0],axis=1) # This contains row numbers
+    loglams = np.array(spectra.columns).astype(np.float) # Extract wavelengths
 
     # Divide spectra into input and output arrays
-    blue = spectra.loc[:,:str(norm_loglam+0.0001)].values
-	red = spectra.loc[:,str(norm_loglam+0.0001):].values
+    blue = spectra.loc[:,:str(norm_loglam)].values
+    red = spectra.loc[:,str(norm_loglam+0.0001):].values
 
+    print(np.shape(blue))
+    print(np.shape(red))
+    print(np.shape(loglams))
     # K-fold split for cleanup
     skfolds = KFold(n_splits=n_folds, random_state=0, shuffle=False)
-	i = 1 # Counter
-	spectra_nan = pd.DataFrame(data=[])
+    i = 1 # Counter
+    spectra_nan = pd.DataFrame(data=[])
     for train_id, test_id in skfolds.split(red,blue):
         print('fold '+str(i))
         train_red_orig = red[train_id]
         train_blue_orig = blue[train_id]
         test_red_orig = red[test_id]
         test_blue_orig = blue[test_id]
-        ids_test = norms.iloc[test_id,0]
 
-        scaler_red, train_red, test_red = Q.standardize(train_red_orig,test_red_orig)
+        _, train_red, test_red = Q.standardize(train_red_orig,test_red_orig)
         scaler_blue, train_blue, test_blue = Q.standardize(train_blue_orig,test_blue_orig)
-        pca_red, train_red, test_red = Q.perform_PCA(train_red,test_red,n_components=pca_variance)
+        _, train_red, test_red = Q.perform_PCA(train_red,test_red,n_components=pca_variance)
         pca_blue, train_blue, test_blue = Q.perform_PCA(train_blue,test_blue,n_components=pca_variance)
 
         reg = RFR(n_estimators=RF_num,random_state=0)
-		reg.fit(train_red,train_blue)
+        reg.fit(train_red,train_blue)
         rf_blue = reg.predict(test_red)
 
         rf_blue_trans = scaler_blue.inverse_transform(pca_blue.inverse_transform(rf_blue))
 
 		# Reject data points in the test fold
-		err = ((np.abs(rf_blue_trans - test_blue_orig)/test_blue_orig)).mean(axis=0) # Calculate mean absolute error for each wavelength
-		std = ((np.abs(rf_blue_trans - test_blue_orig)/test_blue_orig)).std(axis=0) # Calculate std of absolute error for each wavelength
+        err = ((np.abs(rf_blue_trans - test_blue_orig)/test_blue_orig)).mean(axis=0) # Calculate mean absolute error for each wavelength
+        std = ((np.abs(rf_blue_trans - test_blue_orig)/test_blue_orig)).std(axis=0) # Calculate std of absolute error for each wavelength
 		# Reject data points that lie above 3 standard deviations away from mean
-		test_blue_clean = np.where(((rf_blue_trans - test_blue_orig)/test_blue_orig) < err+3*std,test_blue_orig,np.nan)
-		rf_blue_clean = np.where(((rf_blue_trans - test_blue_orig)/test_blue_orig) < err+3*std,rf_blue_trans,np.nan)
+        test_blue_clean = np.where(((rf_blue_trans - test_blue_orig)/test_blue_orig) < err+3*std,test_blue_orig,np.nan)
+        rf_blue_clean = np.where(((rf_blue_trans - test_blue_orig)/test_blue_orig) < err+3*std,rf_blue_trans,np.nan)
 
         # Calculate fraction of rejected data points
-		rejected = sum(sum(np.isnan(rf_blue_clean)))
-		total = np.int(np.size(rf_blue_clean))
-		print('rejected '+np.str(np.float(rejected)/np.float(total)))
-
+        rejected = sum(sum(np.isnan(rf_blue_clean)))
+        total = np.int(np.size(rf_blue_clean))
+        print('rejected '+np.str(np.float(rejected)/np.float(total)))
+        print(np.shape(test_blue_clean))
+        print(np.shape(test_red_orig))
         # Append the clean arrays to prepared dataframes
-		test_new = np.concatenate((test_blue_clean,test_red_orig),axis=1)
-		test_df = pd.DataFrame(data=test_new,columns=loglams,index=test_id)
-		spectra_nan = spectra_nan.append(test_df)
+        test_new = np.concatenate((test_blue_clean,test_red_orig),axis=1)
+        test_df = pd.DataFrame(data=test_new,columns=loglams,index=test_id)
+        spectra_nan = spectra_nan.append(test_df)
 
         i += 1
     
     # Drop spectra with rejected data points
     spectra_clean = spectra_nan.dropna(axis=0,how='any')
-	spectra_clean.to_csv(str(path_to_clean_spectra))
+    spectra_clean.to_csv(str(path_to_clean_spectra))
     norms_clean = norms[norms.iloc[:,1].isin(spectra_clean.iloc[:,0])]
-	norms_clean = norms_clean.drop(norms.columns[0],axis=1)
-	norms_clean.to_csv(str(path_to_clean_norms))
+    norms_clean = norms_clean.drop(norms.columns[0],axis=1)
+    norms_clean.to_csv(str(path_to_clean_norms))
 	
-	spectra_bad = spectra_nan[~spectra_nan.index.isin(spectra_clean.index)]
-	spectra_bad_full = spectra.iloc[spectra_bad.index]
-	spectra_bad_full.to_csv(str(path_to_bad_spectra))
+    spectra_bad = spectra_nan[~spectra_nan.index.isin(spectra_clean.index)]
+    spectra_bad_full = spectra.iloc[spectra_bad.index]
+    spectra_bad_full.to_csv(str(path_to_bad_spectra))
     norms_bad = norms[norms.iloc[:,1].isin(spectra_bad.iloc[:,0])]
-	norms_bad = norms_bad.drop(norms.columns[0],axis=1)
-	norms_bad.to_csv(str(path_to_bad_norms))
+    norms_bad = norms_bad.drop(norms.columns[0],axis=1)
+    norms_bad.to_csv(str(path_to_bad_norms))
 
     return spectra_clean, norms_clean, spectra_bad, norms_bad
 
