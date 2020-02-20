@@ -1,3 +1,21 @@
+# -*- coding: utf-8 -*-
+##########################################
+
+# Author: Dominika Ďurovčíková (University of Oxford)
+# Correspondence: dominika.durovcikova@gmail.com
+
+# If used, please cite:
+
+# Ďurovčíková, D., Katz, H., Bosman, S.E.I., Davies, F.B., Devriendt, J. and Slyz, A., 2019.
+# Reionization history constraints from neural network based predictions of high-redshift quasar continua.
+# arXiv preprint arXiv:1912.01050.
+
+##########################################
+
+# This module contains routines to build and train QSANNdRA. For a full description of the
+# procedure, please refer to Ďurovčíková et al. 2019 (https://arxiv.org/abs/1912.01050).
+
+
 import numpy as np
 import matplotlib.pyplot as plt
 import pyfits as pf
