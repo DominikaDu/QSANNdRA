@@ -107,7 +107,7 @@ def running_median(datx,daty,bin_size=30,shuffle=5,Lya=False):
                 break             
     return np.array(xvals),np.array(yvals)
 
-def smooth(x,y,y_err,mask=None):
+def smooth(x,y,y_err,mask=[],bin_s=20,shuf=10,Lya=True):
     # Smooths raw input spectral data given by (x,y) and errors y_err according to procedure outlined in Appendix B
     # of Ďurovčíková et al. 2019 (https://arxiv.org/abs/1912.01050).
     # In this process, a mask can be used to reject some data points from the smoothing procedure.
@@ -116,25 +116,26 @@ def smooth(x,y,y_err,mask=None):
         x = x[mask]
         y = y[mask]
         y_err = y_err[mask]
-	
-	# 1. Compute upper envelope:
-	[x_bor,y_bor] = running_median(x,y,bin_size=50,shuffle=10)
-	border = interpolate.interp1d(x_bor,y_bor,bounds_error=False,fill_value='extrapolate')
-	env_mask, _ = find_peaks(y,height=(border(x),None))
-	x_env = x[env_mask]
-	env = y[env_mask]
-	f = interpolate.interp1d(x_env,env,bounds_error=False,fill_value='extrapolate')
-	# 2. Subtract the envelope from raw data points to linearize the data:
-	linear_y = y - f(x)
-	
+
+    # 1. Compute upper envelope:
+    [x_bor,y_bor] = running_median(x,y,bin_size=50,shuffle=10)
+    border = interpolate.interp1d(x_bor,y_bor,bounds_error=False,fill_value='extrapolate')
+    env_mask, _ = find_peaks(y,height=(border(x),None))
+    x_env = x[env_mask]
+    env = y[env_mask]
+    f = interpolate.interp1d(x_env,env,bounds_error=False,fill_value='extrapolate')
+    # 2. Subtract the envelope from raw data points to linearize the data:
+    linear_y = y - f(x)
+    linear_y = np.nan_to_num(linear_y)
+    y_err[np.isnan(y_err)]=0.5 # Sufficiently small weight
 	# 3. Apply RANSAC to detect outlying pixels (absorption features) and mask them out.
 	# Note: we weigh the raw data points according to their errors.
-	mad = np.average(np.abs(np.median(linear_y)-linear_y),weights=np.divide(y_err,np.sum(y_err)))
-	ransac = linear_model.RANSACRegressor(random_state=0,loss='absolute_loss',residual_threshold=2.0*mad)
-	ransac.fit(x.reshape(len(x),1), linear_y,sample_weight=np.abs(y_err))
-	inlier_mask = ransac.inlier_mask_
-	outlier_mask = np.logical_not(inlier_mask)
-	
-	#4. smooth the inlier data points
-	[xx,yy] = running_median(x[inlier_mask],y[inlier_mask],bin_size=20,shuffle=10,Lya=True)
-	return np.array(xx), np.array(yy)
+    mad = np.average(np.abs(np.median(linear_y)-linear_y),weights=np.divide(y_err,np.sum(y_err)))
+    ransac = linear_model.RANSACRegressor(random_state=0,loss='absolute_loss',residual_threshold=2.0*mad)
+    ransac.fit(x.reshape(len(x),1), linear_y,sample_weight=np.abs(y_err))
+    inlier_mask = ransac.inlier_mask_
+    outlier_mask = np.logical_not(inlier_mask)
+
+    #4. smooth the inlier data points
+    [xx,yy] = running_median(x[inlier_mask],y[inlier_mask],bin_size=bin_s,shuffle=shuf,Lya=Lya)
+    return np.array(xx), np.array(yy)

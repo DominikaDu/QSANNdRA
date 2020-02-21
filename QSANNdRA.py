@@ -58,9 +58,11 @@ def train_test_split(dataframe,ratio=0.8,lam=1290):
 
     loglam = np.around(np.log10(lam),decimals=4)
     train_blue = train.loc[:,:str(loglam)].values
-    train_red = train.loc[:,str(loglam+0.0001):].values
+    train_red = train.loc[:,str(loglam):].values
     test_blue = test.loc[:,:str(loglam)].values
-    test_red = test.loc[:,str(loglam+0.0001):].values
+    test_red = test.loc[:,str(loglam):].values # This division is OK, as 'loglam' column is dropped (ie no overlap in values)
+    print(np.shape(train_blue))
+    print(np.shape(train_red))
 
     return train_red, train_blue, test_red, test_blue
 
