@@ -1,5 +1,15 @@
 /data/QSO_catalog/*
 /data/training_fits/*
 /data/dataframes/*
+/data/high-z/*
+
+/models/*
+/plots/*
 
 *.pyc
+
+preprocessing.sh
+preprocessing.sh.sh
+download_SDSS.txt
+
+super_duper_*

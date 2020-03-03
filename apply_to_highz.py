@@ -59,9 +59,9 @@ def import_preprocessing_models(path_to_models):
     return scaler_one_red, scaler_one_blue, pca_red, pca_blue, scaler_two_red, scaler_two_blue
 
 def load_reconstructed_file(path_to_file):
-    spec = np.loadtxt(str(path_to_file),delimiter=',',dtype=float)
-    loglams = spec[0,:]
-    flux = spec[1,:]
+    spec = np.loadtxt(str(path_to_file),delimiter=' ',dtype=float)
+    loglams = np.around(np.log10(spec[:,0]),decimals=4)
+    flux = spec[:,1]
     spec = pd.DataFrame(data=[flux],columns=np.asarray(loglams,dtype='str'))
     loglams = np.array(spec.columns).astype(np.float)
     red = spec.loc[:,u'3.1106':].values
@@ -69,7 +69,7 @@ def load_reconstructed_file(path_to_file):
 
     return red, blue, loglams
 
-def apply_QSANNdRA(red_side,blue_side,loglams,path_to_models,name_file,C=100):
+def apply_QSANNdRA(red_side,blue_side,loglams,path_to_models,name_file,norm,C=100):
     
     scaler_one_red, scaler_one_blue, pca_red, pca_blue, scaler_two_red, scaler_two_blue = \
         import_preprocessing_models(path_to_models=str(path_to_models)+'preprocessing_models/')
@@ -91,13 +91,17 @@ def apply_QSANNdRA(red_side,blue_side,loglams,path_to_models,name_file,C=100):
     err_norm = errs.sum(axis=1)
     w = np.divide(errs,err_norm[:,None])
     mean_prediction = np.average(predictions,weights=w,axis=1)
-    np.savetxt('data/high-z/predictions/'+str(name_file)+'_prediction_mean.csv',np.transpose([loglams[:len(mean_prediction)],mean_prediction]),delimiter=',')
-    np.savetxt('data/high-z/predictions/'+str(name_file)+'_predictions.csv',\
-        np.transpose(np.concatenate((np.reshape(loglams,(len(loglams),1))[:len(mean_prediction),:],predictions),axis=1)),delimiter=',')
+    save_ar = np.concatenate(((np.reshape(10**loglams,(len(loglams),1))[:len(mean_prediction),:]),predictions),axis=1)
+    print(np.shape(save_ar))
+    np.savetxt('data/high-z/predictions/'+str(name_file)+'_prediction_mean.txt',np.transpose([10**loglams[:len(mean_prediction)],mean_prediction]),delimiter=' ',fmt='%1.10f',\
+        header='Mean prediction of QSANNdRA for the spectrum of '+str(name_file)+' normalized at 1290 A. Normalization constant: '+str(norm))
+    np.savetxt('data/high-z/predictions/'+str(name_file)+'_predictions.txt',\
+            save_ar,delimiter=' ',fmt='%1.10f',\
+            header='All predictions of QSANNdRA for the spectrum of '+str(name_file)+' normalized at 1290 A. Normalization constant: '+str(norm))
 
     return mean_prediction, predictions
 
-def plot_predictions(loglam_raw,flux_raw,f_err_raw,loglams,red,predictions,mean_prediction,norm,norm_Lya,z_quasar,name_file,name_plot,damping_wing=False,x_HI_mean=None,x_HI_std=None):
+def plot_predictions(loglam_raw,flux_raw,f_err_raw,loglams,red,predictions,mean_prediction,norm,norm_Lya,z_quasar,name_file,name_plot,damping_wing=False,x_HI_mean=None,x_HI_std=None,mask=None):
     plt.rc('text',usetex=True)
     font = {'family':'sans-serif','sans-serif':['Helvetica'],'size':8}
     plt.rc('font',**font)
@@ -112,6 +116,9 @@ def plot_predictions(loglam_raw,flux_raw,f_err_raw,loglams,red,predictions,mean_
     axs[1].set_xlim([1185, 1300])
     mx = np.max(np.max(np.divide(predictions*norm,norm_Lya)))
     axs[1].set_ylim([-0.02,1.2*mx])
+    if len(mask)>0:
+        axs[0].vlines(x=(10**loglam_raw[mask]),ymin=-0.02,ymax=1.2*mx,color='lightgray',zorder=0)
+        axs[1].vlines(x=(10**loglam_raw[mask]),ymin=-0.02,ymax=1.2*mx,color='lightgray',zorder=0)
     axs[0].plot(10**loglams[:len(predictions[:,0])],np.divide(predictions*norm,norm_Lya),c='m',linewidth = 1,alpha=0.05)
     axs[1].plot(10**loglams[:len(predictions[:,0])],np.divide(predictions*norm,norm_Lya),c='m',linewidth = 1,alpha=0.05)
     if damping_wing:
@@ -220,3 +227,4 @@ def model_damping_wing(loglam_predictions,predictions,loglam_raw,flux_raw,f_err_
     print(x_HI_std)
 
     return x_HI_mean, x_HI_std
+
