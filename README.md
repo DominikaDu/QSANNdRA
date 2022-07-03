@@ -26,6 +26,8 @@ To preprocess high-redshift data, use script "example_high-z.py".
 
 To apply QSANNdRA, use script "example_apply.py".
 
+![example result](plots/high-z/example_result.png)
+
 ## Contact
 
 Please contact Dominika Ďurovčíková at dominika.durovcikova@gmail.com in case of questions/issues.
