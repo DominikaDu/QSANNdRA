@@ -12,11 +12,19 @@ Monthly Notices of the Royal Astronomical Society, Volume 493, Issue 3, April 20
 
 ### Preprocessing
 
+To preprocess low-redshift training data, use script "example_preprocessing.py".
+
 ![preprocessing example](plots/preprocessing/spec-4535-55860-0304.fits_example.png)
 
 ### Building QSANNdRA
 
+To build and train QSANNdRA, use script "example_training.py".
+
 ### Application to high-redshift quasars
+
+To preprocess high-redshift data, use script "example_high-z.py".
+
+To apply QSANNdRA, use script "example_apply.py".
 
 ## Contact
 
