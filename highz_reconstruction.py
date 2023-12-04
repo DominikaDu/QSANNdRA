@@ -6,9 +6,7 @@
 
 # If used, please cite:
 
-# Ďurovčíková, D., Katz, H., Bosman, S.E.I., Davies, F.B., Devriendt, J. and Slyz, A., 2019.
-# Reionization history constraints from neural network based predictions of high-redshift quasar continua.
-# arXiv preprint arXiv:1912.01050.
+# D. Ďurovčíková, H. Katz, S. E. I. Bosman, F. B. Davies, J. Devriendt, and A. Slyz, Monthly Notices of the Royal Astronomical Society 493, 4256 (2020).
 
 ##########################################
 
