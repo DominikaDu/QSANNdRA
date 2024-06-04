@@ -1,14 +1,14 @@
-/data/QSO_catalog/*
-/data/training_fits/*
-/data/dataframes/*
-/data/high-z/*
+__pycache__/
 
-/models/*
+.ipynb_checkpoints/
 
-*.pyc
+catalogs/*
 
-preprocessing.sh
-preprocessing.sh.sh
-download_SDSS.txt
+data/
+models/
+plots/
 
-super_duper_*
+SDSS_quasars/
+
+*.txt
+*.png
