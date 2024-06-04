@@ -2,10 +2,7 @@
 
 This code was developed by Dominika Ďurovčíková and first implemented in [Ďurovčíková et al. 2020](https://ui.adsabs.harvard.edu/abs/2020MNRAS.493.4256D/abstract), and it was most recently updated as a result of [Ďurovčíková et al. 2024](https://ui.adsabs.harvard.edu/abs/2024arXiv240110328D/abstract).
 
-Please include the following citation if you use this code:
-
-D. Ďurovčíková, H. Katz, S. E. I. Bosman, F. B. Davies, J. Devriendt, and A. Slyz, Monthly Notices of the Royal Astronomical Society 493, 4256 (2020).
-
+Please cite both references if you use this code.
 
 ## Update
 
@@ -21,7 +18,7 @@ Please contact Dominika Ďurovčíková at dominika.durovcikova@gmail.com in cas
 
 To preprocess low-redshift training data, use script "example_preprocessing.py".
 
-![preprocessing example](plots/preprocessing/spec-4535-55860-0304.fits_example.png)
+![preprocessing example](archive/plots/preprocessing/spec-4535-55860-0304.fits_example.png)
 
 ### Building QSANNdRA
 
@@ -33,4 +30,4 @@ To preprocess high-redshift data, use script "example_high-z.py".
 
 To apply QSANNdRA, use script "example_apply.py".
 
-![example result](plots/high-z/example_result.png)
+![example result](archive/plots/high-z/example_result.png)
